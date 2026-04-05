@@ -5,9 +5,6 @@ interface Env {
 const CLEANUP_CONFIG = {
   // Whether to delete expired emails
   DELETE_EXPIRED_EMAILS: true,
-  
-  // Batch processing size
-  BATCH_SIZE: 100,
 } as const 
 
 const main = {
@@ -19,20 +16,19 @@ const main = {
         console.log('Expired email deletion is disabled')
         return
       }
-
-      const result = await env.DB
-        .prepare(`
-          DELETE FROM email 
-          WHERE expires_at < ?
-          LIMIT ?
-        `)
-        .bind(now, CLEANUP_CONFIG.BATCH_SIZE)
-        .run()
-
-      if (result.success) {
-        console.log(`Deleted ${result?.meta?.changes ?? 0} expired emails and their associated messages`)
+      // 清理过期邮箱
+      const email_rst = await env.DB.prepare(`DELETE FROM email WHERE expires_at < ?`).bind(now).run()
+      if (email_rst.success) {
+        console.log(`Deleted ${email_rst?.meta?.changes ?? 0} expired emails and their associated messages`)
       } else {
         console.error('Failed to delete expired emails')
+      }
+      // 清理过期邮件
+      const message_rst = await env.DB.prepare(`DELETE FROM message WHERE received_at < ?`).bind(now).run()
+      if (message_rst.success) {
+        console.log(`Deleted ${message_rst?.meta?.changes ?? 0} expired messages`)
+      } else {
+        console.error('Failed to delete expired messages')
       }
     } catch (error) {
       console.error('Failed to cleanup:', error)
